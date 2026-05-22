@@ -6,6 +6,8 @@ metadata:
     app: catalog-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: catalog-service
@@ -121,12 +123,16 @@ spec:
               port: 3002
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /api/catalog/health
               port: 3002
-            initialDelaySeconds: 30
+            initialDelaySeconds: 90
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests:
               cpu: 100m

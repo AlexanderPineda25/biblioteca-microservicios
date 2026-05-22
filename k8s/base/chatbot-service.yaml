@@ -6,6 +6,8 @@ metadata:
     app: chatbot-service
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: chatbot-service
@@ -105,12 +107,16 @@ spec:
               port: 3003
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /api/chatbot/health
               port: 3003
-            initialDelaySeconds: 25
+            initialDelaySeconds: 60
             periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             requests:
               cpu: 100m

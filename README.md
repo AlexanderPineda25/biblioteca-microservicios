@@ -45,12 +45,13 @@ Manifiestos:
 ```text
 k8s/base
 k8s/overlays/aks
+k8s/overlays/aks-no-domain
 ```
 
 Validar render:
 
 ```powershell
-kubectl kustomize k8s/overlays/aks
+kubectl kustomize k8s/overlays/aks-no-domain
 ```
 
 Pipeline:
@@ -60,6 +61,14 @@ Pipeline:
 ```
 
 El pipeline despliega `identity-service`, `catalog-service` y `chatbot-service` de manera independiente con `kubectl set image`.
+
+Despliegue AKS verificado:
+
+```text
+http://52.158.169.2
+ACR: acrbiblioalex25.azurecr.io
+Imagenes: biblioteca/identity-service, biblioteca/catalog-service, biblioteca/chatbot-service
+```
 
 ## Variables importantes
 
