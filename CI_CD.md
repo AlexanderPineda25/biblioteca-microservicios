@@ -12,8 +12,8 @@ Pipeline:
 2. Valida `chatbot-service` con `npm ci`, `node --check` y `npm audit --audit-level=high`.
 3. Ejecuta pruebas de `identity-service` con `dotnet test`.
 4. Renderiza Kubernetes con `kubectl kustomize`.
-5. Valida que existan variables y secrets de Azure Managed DB, Service Bus y Managed Redis.
-6. Construye imagenes Docker independientes:
+5. Detecta si existen las variables y secrets de Azure Managed DB, Service Bus y Managed Redis.
+6. Si la configuracion esta completa, construye imagenes Docker independientes:
    - `biblioteca/identity-service`
    - `biblioteca/catalog-service`
    - `biblioteca/chatbot-service`
@@ -56,6 +56,8 @@ AZURE_SERVICE_BUS_QUEUE=library-logging-queue
 ```
 
 El workflow corre en pushes a `main` y `master`, ademas de `workflow_dispatch`.
+
+Si faltan variables o secrets, CI queda en verde y el job de CD se omite con un resumen de lo que falta. Esto evita que los pushes normales fallen mientras el repositorio todavia no tiene credenciales de Azure configuradas. Cuando agregues todos los valores, el despliegue a AKS se activa automaticamente en el siguiente push o con `workflow_dispatch`.
 
 ## Secrets del repositorio
 
@@ -113,7 +115,7 @@ El workflow genera `/tmp/backend-rendered.yaml`, reemplaza imagenes y variables 
 
 ## Recuperacion rapida
 
-Si un secret falta, el workflow falla antes de tocar Azure. Si el cluster ya quedo con pods pendientes:
+Si un secret falta, el workflow omite CD antes de tocar Azure. Si el cluster ya quedo con pods pendientes:
 
 ```powershell
 kubectl describe pod -n biblioteca -l app=catalog-service
