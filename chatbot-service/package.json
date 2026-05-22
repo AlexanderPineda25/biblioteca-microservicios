@@ -1,0 +1,25 @@
+{
+  "name": "chatbot-service",
+  "version": "1.0.0",
+  "description": "Microservicio de chatbot IA para Biblioteca U con Redis Streams",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": [
+    "microservice",
+    "chatbot",
+    "ai",
+    "redis-streams"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.8",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "redis": "^4.6.13"
+  }
+}

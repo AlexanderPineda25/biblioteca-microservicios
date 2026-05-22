@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-service
+  labels:
+    app: catalog-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: catalog-service
+  template:
+    metadata:
+      labels:
+        app: catalog-service
+    spec:
+      containers:
+        - name: catalog-service
+          image: biblioteca/catalog-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3002
+              name: http
+          env:
+            - name: PORT
+              value: "3002"
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: POSTGRES_PASSWORD
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: AUTH_SERVICE_URL
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CORS_ORIGINS
+            - name: AI_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: AI_PROVIDER
+            - name: HF_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: HF_MODEL
+            - name: HF_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: HF_API_TOKEN
+            - name: CHAT_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CHAT_PROVIDER
+            - name: GEMINI_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: GEMINI_MODEL
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: GEMINI_API_KEY
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: GROQ_API_KEY
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: OPENROUTER_API_KEY
+            - name: RABBITMQ_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: RABBITMQ_URL
+            - name: AZURE_SERVICE_BUS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: AZURE_SERVICE_BUS_CONNECTION_STRING
+                  optional: true
+            - name: AZURE_SERVICE_BUS_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: AZURE_SERVICE_BUS_QUEUE
+          readinessProbe:
+            httpGet:
+              path: /api/catalog/health
+              port: 3002
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/catalog/health
+              port: 3002
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 600m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: catalog-service
+  labels:
+    app: catalog-service
+spec:
+  type: ClusterIP
+  selector:
+    app: catalog-service
+  ports:
+    - name: http
+      port: 3002
+      targetPort: 3002

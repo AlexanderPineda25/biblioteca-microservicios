@@ -1,0 +1,143 @@
+name: Backend Microservices AKS CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  NAMESPACE: biblioteca
+  IDENTITY_IMAGE: biblioteca-identity-service
+  CATALOG_IMAGE: biblioteca-catalog-service
+  CHATBOT_IMAGE: biblioteca-chatbot-service
+
+jobs:
+  validate:
+    name: Validate backend services
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: |
+            catalog-service/package-lock.json
+            chatbot-service/package-lock.json
+
+      - name: Validate catalog-service
+        working-directory: catalog-service
+        run: |
+          npm ci
+          node --check index.js
+          node --check src/app.js
+          node --check src/services/ai.service.js
+          npm audit --audit-level=high
+
+      - name: Validate chatbot-service
+        working-directory: chatbot-service
+        run: |
+          npm ci
+          node --check index.js
+          node --check src/app.js
+          node --check src/services/chatbot.service.js
+          npm audit --audit-level=high
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Test identity-service
+        working-directory: mini-identity-api-dotnet-main/mini-identity-api-dotnet-main
+        run: |
+          dotnet restore MiniIdentityApi.slnx
+          dotnet test MiniIdentityApi.slnx --configuration Release --no-restore
+
+      - name: Validate Kubernetes manifests
+        uses: azure/setup-kubectl@v4
+
+      - name: Render Kustomize
+        run: kubectl kustomize k8s/overlays/aks > /tmp/backend-rendered.yaml
+
+  build-and-deploy:
+    name: Build images and deploy to AKS
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to Azure Container Registry
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - name: Build and push identity image
+        run: |
+          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}"
+          docker build -t "$IMAGE" ./mini-identity-api-dotnet-main/mini-identity-api-dotnet-main
+          docker push "$IMAGE"
+
+      - name: Build and push catalog image
+        run: |
+          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}"
+          docker build -t "$IMAGE" ./catalog-service
+          docker push "$IMAGE"
+
+      - name: Build and push chatbot image
+        run: |
+          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}"
+          docker build -t "$IMAGE" ./chatbot-service
+          docker push "$IMAGE"
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
+            --name "${{ vars.AKS_CLUSTER_NAME }}" \
+            --overwrite-existing
+
+      - name: Create namespace and secrets
+        run: |
+          kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic biblioteca-secrets \
+            --namespace "$NAMESPACE" \
+            --from-literal=POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}' \
+            --from-literal=HF_API_TOKEN='${{ secrets.HF_API_TOKEN }}' \
+            --from-literal=GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}' \
+            --from-literal=GROQ_API_KEY='${{ secrets.GROQ_API_KEY }}' \
+            --from-literal=OPENROUTER_API_KEY='${{ secrets.OPENROUTER_API_KEY }}' \
+            --from-literal=AZURE_SERVICE_BUS_CONNECTION_STRING='${{ secrets.AZURE_SERVICE_BUS_CONNECTION_STRING }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy backend manifests
+        run: kubectl apply -k k8s/overlays/aks
+
+      - name: Update backend images
+        run: |
+          kubectl set image deployment/identity-service \
+            identity-service="${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}" \
+            --namespace "$NAMESPACE"
+          kubectl set image deployment/catalog-service \
+            catalog-service="${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}" \
+            --namespace "$NAMESPACE"
+          kubectl set image deployment/chatbot-service \
+            chatbot-service="${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}" \
+            --namespace "$NAMESPACE"
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/identity-service --namespace "$NAMESPACE" --timeout=180s
+          kubectl rollout status deployment/catalog-service --namespace "$NAMESPACE" --timeout=180s
+          kubectl rollout status deployment/chatbot-service --namespace "$NAMESPACE" --timeout=180s

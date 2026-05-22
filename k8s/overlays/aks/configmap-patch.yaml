@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biblioteca-config
+data:
+  CORS_ORIGINS: "https://biblioteca.example.com,http://biblioteca.example.com"
+  OPENROUTER_REFERER: "https://biblioteca.example.com"

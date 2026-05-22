@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-service
+  labels:
+    app: chatbot-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatbot-service
+  template:
+    metadata:
+      labels:
+        app: chatbot-service
+    spec:
+      containers:
+        - name: chatbot-service
+          image: biblioteca/chatbot-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3003
+              name: http
+          env:
+            - name: PORT
+              value: "3003"
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: AUTH_SERVICE_URL
+            - name: CATALOG_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CATALOG_SERVICE_URL
+            - name: CORS_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CORS_ORIGINS
+            - name: CHATBOT_PROVIDER
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CHATBOT_PROVIDER
+            - name: GEMINI_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: GEMINI_MODEL
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: GEMINI_API_KEY
+            - name: GROQ_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: GROQ_MODEL
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: GROQ_API_KEY
+            - name: OPENROUTER_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: OPENROUTER_MODEL
+            - name: OPENROUTER_REFERER
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: OPENROUTER_REFERER
+            - name: OPENROUTER_TITLE
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: OPENROUTER_TITLE
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: biblioteca-secrets
+                  key: OPENROUTER_API_KEY
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: REDIS_URL
+            - name: CHATBOT_STREAM_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CHATBOT_STREAM_NAME
+            - name: CHATBOT_STREAM_GROUP
+              valueFrom:
+                configMapKeyRef:
+                  name: biblioteca-config
+                  key: CHATBOT_STREAM_GROUP
+          readinessProbe:
+            httpGet:
+              path: /api/chatbot/health
+              port: 3003
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/chatbot/health
+              port: 3003
+            initialDelaySeconds: 25
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 600m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot-service
+  labels:
+    app: chatbot-service
+spec:
+  type: ClusterIP
+  selector:
+    app: chatbot-service
+  ports:
+    - name: http
+      port: 3003
+      targetPort: 3003

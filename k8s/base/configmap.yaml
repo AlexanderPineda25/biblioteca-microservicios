@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biblioteca-config
+  labels:
+    app.kubernetes.io/part-of: biblioteca-u
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:5132"
+  CORS_ORIGINS: "http://biblioteca.example.com,https://biblioteca.example.com"
+
+  POSTGRES_DB: "catalog_db"
+  POSTGRES_USER: "postgres"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "catalog_db"
+  DB_USER: "postgres"
+
+  AUTH_SERVICE_URL: "http://identity-service:5132"
+  CATALOG_SERVICE_URL: "http://catalog-service:3002"
+
+  AI_PROVIDER: "huggingface"
+  HF_MODEL: "facebook/bart-large-mnli"
+  CHAT_PROVIDER: "gemini"
+  CHATBOT_PROVIDER: "gemini"
+  GEMINI_MODEL: "gemini-2.5-flash"
+  GROQ_MODEL: "llama-3.1-8b-instant"
+  OPENROUTER_MODEL: "mistralai/mistral-7b-instruct:free"
+  OPENROUTER_REFERER: "https://biblioteca.example.com"
+  OPENROUTER_TITLE: "Biblioteca U"
+
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+  REDIS_URL: "redis://redis:6379"
+  CHATBOT_STREAM_NAME: "chatbot_events"
+  CHATBOT_STREAM_GROUP: "chatbot_logger"
+  AZURE_SERVICE_BUS_QUEUE: "library-logging-queue"

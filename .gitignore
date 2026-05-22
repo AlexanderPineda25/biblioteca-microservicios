@@ -1,0 +1,11 @@
+.env
+.env.*
+!*.example
+node_modules/
+bin/
+obj/
+TestResults/
+coverage/
+*.log
+.DS_Store
+Thumbs.db
