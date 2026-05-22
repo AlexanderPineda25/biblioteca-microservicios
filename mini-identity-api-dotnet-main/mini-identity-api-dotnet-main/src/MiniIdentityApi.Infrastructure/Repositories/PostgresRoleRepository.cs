@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using MiniIdentityApi.Application.Interfaces;
 using MiniIdentityApi.Domain.Entities;
+using MiniIdentityApi.Infrastructure.Data;
 using Npgsql;
 using System.Reflection;
 
@@ -12,13 +13,7 @@ public class PostgresRoleRepository : IRoleRepository
 
     public PostgresRoleRepository(IConfiguration configuration)
     {
-        var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-        var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
-        var database = Environment.GetEnvironmentVariable("DB_NAME") ?? "catalog_db";
-        var username = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
-        var password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres123";
-
-        _connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};Include Error Detail=true";
+        _connectionString = PostgresConnectionStringFactory.Create();
     }
 
     public Role? FindByName(string name)

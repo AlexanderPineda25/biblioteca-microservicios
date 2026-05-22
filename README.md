@@ -9,11 +9,11 @@ Este directorio esta listo para publicarse como repositorio backend independient
 | Servicio | Ruta | Puerto | Descripcion |
 | --- | --- | ---: | --- |
 | Identity | `mini-identity-api-dotnet-main/mini-identity-api-dotnet-main` | 5132 | Autenticacion, JWT, roles y permisos |
-| Catalog | `catalog-service` | 3002 | Libros, recomendador IA y eventos RabbitMQ |
+| Catalog | `catalog-service` | 3002 | Libros, recomendador IA y eventos por Azure Service Bus |
 | Chatbot | `chatbot-service` | 3003 | Chatbot IA con Gemini, Groq, OpenRouter y Redis Streams |
-| PostgreSQL | Docker image | 5432 | Persistencia relacional |
-| RabbitMQ | Docker image | 5672, 15672 | Eventos del catalogo |
-| Redis | Docker image | 6379 | Stream de eventos del chatbot |
+| Azure PostgreSQL | Managed service | 5432 | Persistencia relacional administrada |
+| Azure Service Bus | Managed service | 443 | Eventos del catalogo |
+| Azure Managed Redis | Managed service | 10000 | Stream de eventos del chatbot |
 
 ## Ejecucion recomendada
 
@@ -37,6 +37,7 @@ El compose secundario lee `../.env` para pasar las claves IA a los contenedores.
 Documentacion del repo backend:
 
 - Guia AKS: [DEPLOYMENT_AKS.md](DEPLOYMENT_AKS.md)
+- Datos administrados Azure: [MANAGED_DATA_AZURE.md](MANAGED_DATA_AZURE.md)
 - Pipeline CI/CD: [CI_CD.md](CI_CD.md)
 - Tecnologias: [TECHNOLOGIES.md](TECHNOLOGIES.md)
 
@@ -46,12 +47,14 @@ Manifiestos:
 k8s/base
 k8s/overlays/aks
 k8s/overlays/aks-no-domain
+k8s/infrastructure/in-cluster
 ```
 
 Validar render:
 
 ```powershell
 kubectl kustomize k8s/overlays/aks-no-domain
+kubectl kustomize k8s/infrastructure/in-cluster
 ```
 
 Pipeline:
@@ -61,6 +64,8 @@ Pipeline:
 ```
 
 El pipeline despliega `identity-service`, `catalog-service` y `chatbot-service` con manifiestos renderizados por release, usando imagenes `ACR_LOGIN_SERVER/biblioteca/<servicio>:<sha>` y evitando rollouts intermedios.
+
+AKS cloud es app-only: no despliega Postgres, RabbitMQ ni Redis dentro del cluster. Esos manifests quedan en `k8s/infrastructure/in-cluster` solo para laboratorio o rollback.
 
 Despliegue AKS verificado:
 
@@ -75,12 +80,15 @@ Imagenes: biblioteca/identity-service, biblioteca/catalog-service, biblioteca/ch
 ```env
 AUTH_SERVICE_URL=http://identity-service:5132
 CATALOG_SERVICE_URL=http://catalog-service:3002
-RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
-REDIS_URL=redis://redis:6379
+DB_HOST=pg-biblioteca-edu-alex25.postgres.database.azure.com
+DB_SSL=true
+AZURE_SERVICE_BUS_QUEUE=library-logging-queue
+REDIS_URL=rediss://:<redis-key>@redis-biblioteca-edu-alex25.centralus.redis.azure.net:10000
 HF_API_TOKEN=...
 GEMINI_API_KEY=...
 GROQ_API_KEY=...
 OPENROUTER_API_KEY=...
+AZURE_SERVICE_BUS_CONNECTION_STRING=...
 CHATBOT_PROVIDER=gemini
 ```
 

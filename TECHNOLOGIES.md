@@ -8,14 +8,15 @@
 
 ## Data
 
-- PostgreSQL 16 para usuarios, roles, permisos y libros.
-- Redis 7 con Redis Streams para eventos del chatbot.
+- Azure Database for PostgreSQL Flexible Server 16 para usuarios, roles, permisos y libros.
+- Azure Managed Redis con Redis Streams para eventos del chatbot.
+- Los manifests legacy de Postgres y Redis quedan solo para laboratorio local en `k8s/infrastructure/in-cluster`.
 
 ## Messaging
 
-- RabbitMQ para eventos del catalogo.
-- Redis Streams como tecnologia gratuita seleccionada del requisito Azure Service Bus / Kafka / Redis Streams.
-- Azure Service Bus queda soportado opcionalmente por `catalog-service` si se configura connection string.
+- Azure Service Bus Queue para eventos del catalogo en AKS.
+- RabbitMQ queda como fallback local, fuera del despliegue cloud.
+- Redis Streams se mantiene como patron de eventos del chatbot sobre Azure Managed Redis.
 
 ## AI
 
@@ -31,3 +32,4 @@
 - GitHub Actions para CI/CD.
 - Azure Container Registry para imagenes.
 - Azure Kubernetes Service para orquestacion.
+- Azure Managed services para datos y mensajeria persistente fuera de Kubernetes.

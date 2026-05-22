@@ -88,8 +88,8 @@ spec:
                   key: OPENROUTER_API_KEY
             - name: REDIS_URL
               valueFrom:
-                configMapKeyRef:
-                  name: biblioteca-config
+                secretKeyRef:
+                  name: biblioteca-secrets
                   key: REDIS_URL
             - name: CHATBOT_STREAM_NAME
               valueFrom:

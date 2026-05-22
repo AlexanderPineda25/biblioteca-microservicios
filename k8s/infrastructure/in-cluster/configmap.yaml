@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: biblioteca-config
+  labels:
+    app.kubernetes.io/part-of: biblioteca-u
+data:
+  POSTGRES_DB: "catalog_db"
+  POSTGRES_USER: "postgres"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "catalog_db"
+  DB_USER: "postgres"
+  DB_SSL: "false"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+  REDIS_URL: "redis://redis:6379"

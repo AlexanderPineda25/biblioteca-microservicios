@@ -1,21 +1,40 @@
 # Backend AKS deployment guide
 
-Este repositorio backend despliega microservicios reales en AKS:
+Este repositorio despliega solo microservicios de aplicacion en AKS:
 
 - `identity-service` (.NET)
 - `catalog-service` (Node.js)
 - `chatbot-service` (Node.js)
-- `postgres`
-- `rabbitmq`
-- `redis`
 
-## Requisitos
+La infraestructura persistente vive fuera del cluster:
 
-- Azure CLI autenticado.
-- AKS creado y conectado con `az aks get-credentials`.
-- ACR creado y conectado al cluster.
-- `kubectl`.
-- Ingress controller, recomendado `ingress-nginx`.
+- PostgreSQL: Azure Database for PostgreSQL Flexible Server.
+- Eventos de catalogo: Azure Service Bus Queue.
+- Redis Streams del chatbot: Azure Managed Redis.
+
+AKS no debe ejecutar contenedores de `postgres`, `rabbitmq` ni `redis` en el despliegue cloud.
+
+## Recursos Azure actuales
+
+```text
+Resource group: rg-biblioteca-aks-edu
+AKS: aks-biblioteca-edu
+ACR: acrbiblioalex25.azurecr.io
+Public URL: http://52.158.169.2
+
+PostgreSQL: pg-biblioteca-edu-alex25.postgres.database.azure.com
+Database: catalog_db
+DB user: biblioadmin
+DB SSL: true
+
+Service Bus namespace: sb-biblioteca-edu-alex25
+Service Bus queue: library-logging-queue
+
+Managed Redis host: redis-biblioteca-edu-alex25.centralus.redis.azure.net
+Managed Redis port: 10000
+```
+
+Las credenciales no se versionan. Quedan en Kubernetes como `Secret/biblioteca-secrets` y deben configurarse tambien como GitHub Actions secrets.
 
 ## Estructura Kubernetes
 
@@ -24,85 +43,87 @@ k8s/
   base/
     namespace.yaml
     configmap.yaml
-    secret.template.yaml
-    postgres.yaml
-    rabbitmq.yaml
-    redis.yaml
     identity-service.yaml
     catalog-service.yaml
     chatbot-service.yaml
     ingress.yaml
   overlays/
     aks/
-      kustomization.yaml
-      configmap-patch.yaml
-      ingress-patch.yaml
     aks-no-domain/
-      kustomization.yaml
-      remove-ingress-host.yaml
+  infrastructure/
+    in-cluster/
+      postgres.yaml
+      rabbitmq.yaml
+      redis.yaml
+      init.sql
 ```
 
-Render local:
+`k8s/base` y los overlays AKS son app-only. `k8s/infrastructure/in-cluster` queda como referencia para laboratorio local o rollback, pero no se aplica en Azure.
+
+Validar render:
 
 ```powershell
 kubectl kustomize k8s/overlays/aks-no-domain
+kubectl kustomize k8s/infrastructure/in-cluster
 ```
 
-Usa `aks-no-domain` para demo por IP publica. Usa `aks` cuando ya tengas DNS para `api.biblioteca.example.com`.
+## Secretos requeridos
 
-## Valores usados en el despliegue AKS actual
-
-```powershell
-$RESOURCE_GROUP="rg-biblioteca-aks-edu"
-$AKS_NAME="aks-biblioteca-edu"
-$ACR_NAME="acrbiblioalex25"
-$ACR_LOGIN_SERVER="acrbiblioalex25.azurecr.io"
-$INGRESS_IP="52.158.169.2"
-$TAG="aks-20260522-063426"
+```text
+POSTGRES_PASSWORD
+HF_API_TOKEN
+GEMINI_API_KEY
+GROQ_API_KEY
+OPENROUTER_API_KEY
+REDIS_URL
+AZURE_SERVICE_BUS_CONNECTION_STRING
 ```
 
-## Secretos
+`REDIS_URL` usa TLS contra Azure Managed Redis:
 
-No subas secretos al repositorio. Crea el secret en Kubernetes:
+```text
+rediss://:<REDIS_KEY>@redis-biblioteca-edu-alex25.centralus.redis.azure.net:10000
+```
+
+Crear o actualizar el Secret sin imprimir valores:
 
 ```powershell
 kubectl create namespace biblioteca --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic biblioteca-secrets `
   --namespace biblioteca `
-  --from-literal=POSTGRES_PASSWORD="postgres123" `
-  --from-literal=HF_API_TOKEN="hf_xxx" `
-  --from-literal=GEMINI_API_KEY="gemini_xxx" `
-  --from-literal=GROQ_API_KEY="groq_xxx" `
-  --from-literal=OPENROUTER_API_KEY="openrouter_xxx" `
-  --from-literal=AZURE_SERVICE_BUS_CONNECTION_STRING="" `
+  --from-literal=POSTGRES_PASSWORD="<postgres-password>" `
+  --from-literal=HF_API_TOKEN="<hf-token>" `
+  --from-literal=GEMINI_API_KEY="<gemini-key>" `
+  --from-literal=GROQ_API_KEY="<groq-key>" `
+  --from-literal=OPENROUTER_API_KEY="<openrouter-key>" `
+  --from-literal=REDIS_URL="<managed-redis-rediss-url>" `
+  --from-literal=AZURE_SERVICE_BUS_CONNECTION_STRING="<service-bus-connection-string>" `
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-## Build y push de imagenes
+## Build y push manual
 
 ```powershell
 $ACR="acrbiblioalex25.azurecr.io"
 $TAG="manual"
 
+az acr login --name acrbiblioalex25
+
 docker build -t "$ACR/biblioteca/identity-service:$TAG" ./mini-identity-api-dotnet-main/mini-identity-api-dotnet-main
 docker build -t "$ACR/biblioteca/catalog-service:$TAG" ./catalog-service
 docker build -t "$ACR/biblioteca/chatbot-service:$TAG" ./chatbot-service
 
-az acr login --name acrbiblioalex25
 docker push "$ACR/biblioteca/identity-service:$TAG"
 docker push "$ACR/biblioteca/catalog-service:$TAG"
 docker push "$ACR/biblioteca/chatbot-service:$TAG"
 ```
 
-## Aplicar manifiestos
-
-Aplica el manifiesto ya renderizado con la imagen final. No apliques primero `latest` y luego `kubectl set image`, porque en AKS Education con un solo nodo eso crea rollouts dobles y puede dejar ReplicaSets viejos ocupando CPU.
+## Aplicar manifiestos app-only
 
 ```powershell
 $ACR="acrbiblioalex25.azurecr.io"
-$TAG="aks-20260522-063426"
-$INGRESS_IP="52.158.169.2"
+$TAG="manual"
 $PUBLIC_BASE_URL="http://52.158.169.2"
 
 kubectl kustomize k8s/overlays/aks-no-domain |
@@ -114,105 +135,77 @@ kubectl kustomize k8s/overlays/aks-no-domain |
        -replace 'OPENROUTER_REFERER: .*', "OPENROUTER_REFERER: $PUBLIC_BASE_URL"
   } |
   kubectl apply -f -
+
+kubectl rollout status deployment/identity-service -n biblioteca --timeout=420s
+kubectl rollout status deployment/catalog-service -n biblioteca --timeout=420s
+kubectl rollout status deployment/chatbot-service -n biblioteca --timeout=300s
+```
+
+## Retirar infraestructura in-cluster
+
+Despues de validar Azure Managed DB, Service Bus y Managed Redis:
+
+```powershell
+kubectl delete deployment postgres rabbitmq redis -n biblioteca --ignore-not-found=true
+kubectl delete service postgres rabbitmq redis -n biblioteca --ignore-not-found=true
+kubectl delete configmap postgres-init-sql -n biblioteca --ignore-not-found=true
+kubectl delete pvc postgres-data redis-data -n biblioteca --ignore-not-found=true
 ```
 
 ## Verificacion
 
 ```powershell
-kubectl get pods -n biblioteca
-kubectl rollout status deployment/postgres -n biblioteca --timeout=420s
-kubectl rollout status deployment/rabbitmq -n biblioteca --timeout=420s
-kubectl rollout status deployment/identity-service -n biblioteca
-kubectl rollout status deployment/catalog-service -n biblioteca
-kubectl rollout status deployment/chatbot-service -n biblioteca
+kubectl get pods,deploy,svc -n biblioteca
 
-kubectl logs deployment/chatbot-service -n biblioteca --tail=80
-kubectl exec deployment/redis -n biblioteca -- redis-cli XLEN chatbot_events
-```
-
-Health checks publicos:
-
-```powershell
 Invoke-RestMethod "http://52.158.169.2/health"
 Invoke-RestMethod "http://52.158.169.2/api/catalog/health"
 Invoke-RestMethod "http://52.158.169.2/api/chatbot/health"
 ```
 
-Port-forward temporal si no tienes ingress:
+Verifica que no existan servicios internos de infraestructura:
 
 ```powershell
-kubectl port-forward svc/identity-service 5132:5132 -n biblioteca
-kubectl port-forward svc/catalog-service 3002:3002 -n biblioteca
-kubectl port-forward svc/chatbot-service 3003:3003 -n biblioteca
+kubectl get svc -n biblioteca
 ```
 
-## Despliegue independiente
+Debe mostrar solo:
 
-Cada microservicio tiene Deployment y Service propios. Para desplegar solo uno:
+```text
+biblioteca-frontend
+identity-service
+catalog-service
+chatbot-service
+```
+
+## Migracion de datos
+
+La migracion se hizo desde el PostgreSQL anterior dentro de AKS hacia Azure PostgreSQL con `pg_dump | psql`.
+
+Patron general:
 
 ```powershell
-kubectl set image deployment/chatbot-service chatbot-service="$ACR/biblioteca/chatbot-service:$TAG" -n biblioteca
-kubectl rollout status deployment/chatbot-service -n biblioteca
+$PG_HOST="pg-biblioteca-edu-alex25.postgres.database.azure.com"
+$PG_USER="biblioadmin"
+$PG_DB="catalog_db"
+
+kubectl exec -n biblioteca deployment/postgres -- sh -c `
+  "PGPASSWORD='postgres123' pg_dump -U postgres -d catalog_db --clean --if-exists --no-owner --no-privileges | PGPASSWORD='<postgres-password>' psql 'host=$PG_HOST port=5432 dbname=$PG_DB user=$PG_USER sslmode=require'"
 ```
 
-Esto permite actualizar chatbot sin recrear catalogo, identity o frontend.
+## Cuidar creditos Azure Education
 
-## Recuperar rollout atascado en AKS Education
-
-En un AKS de un solo nodo, si ves `Insufficient cpu`, `ImagePullBackOff` de ReplicaSets viejos o rollouts duplicados, libera primero los pods del backend:
+AKS se puede detener:
 
 ```powershell
-kubectl -n biblioteca scale deployment/postgres deployment/rabbitmq deployment/identity-service deployment/catalog-service deployment/chatbot-service --replicas=0
-
-foreach ($app in @("postgres","rabbitmq","identity-service","catalog-service","chatbot-service")) {
-  kubectl -n biblioteca wait --for=delete pod -l "app=$app" --timeout=180s
-}
+az aks stop -g rg-biblioteca-aks-edu -n aks-biblioteca-edu
+az aks start -g rg-biblioteca-aks-edu -n aks-biblioteca-edu
 ```
 
-Luego aplica de nuevo el overlay y sube las imagenes correctas. Los manifiestos usan `strategy: Recreate` en backend para evitar duplicar pods durante upgrades en nodos pequenos. PostgreSQL usa `PGDATA=/var/lib/postgresql/data/pgdata` para funcionar con Azure Disk, que crea `lost+found` en la raiz del volumen.
-
-## Reparar errores comunes
-
-### `InvalidImageName`
-
-Esto ocurre cuando el campo `image` del Deployment contiene texto que no es una referencia Docker valida. En este proyecto paso al capturar por error logs de `docker build/push` dentro del valor de imagen. Solucion:
+PostgreSQL Flexible Server tambien se puede detener:
 
 ```powershell
-$ACR="acrbiblioalex25.azurecr.io"
-$TAG="aks-20260522-063426"
-$PUBLIC_BASE_URL="http://52.158.169.2"
-
-kubectl kustomize k8s/overlays/aks-no-domain |
-  ForEach-Object {
-    $_ -replace 'image: .*identity-service:.*', "image: $ACR/biblioteca/identity-service:$TAG" `
-       -replace 'image: .*catalog-service:.*', "image: $ACR/biblioteca/catalog-service:$TAG" `
-       -replace 'image: .*chatbot-service:.*', "image: $ACR/biblioteca/chatbot-service:$TAG" `
-       -replace 'CORS_ORIGINS: .*', "CORS_ORIGINS: $PUBLIC_BASE_URL" `
-       -replace 'OPENROUTER_REFERER: .*', "OPENROUTER_REFERER: $PUBLIC_BASE_URL"
-  } |
-  kubectl apply -f -
+az postgres flexible-server stop -g rg-biblioteca-aks-edu -n pg-biblioteca-edu-alex25
+az postgres flexible-server start -g rg-biblioteca-aks-edu -n pg-biblioteca-edu-alex25
 ```
 
-### `CreateContainerConfigError` por `POSTGRES_PASSWORD`
-
-Si `kubectl describe pod` muestra `couldn't find key POSTGRES_PASSWORD in Secret biblioteca/biblioteca-secrets`, el Secret fue creado o sobrescrito incompleto. Repara solo la llave faltante para no borrar las llaves de IA:
-
-```powershell
-$postgresPasswordB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("postgres123"))
-$patch = @{ data = @{ POSTGRES_PASSWORD = $postgresPasswordB64 } } | ConvertTo-Json -Compress
-
-kubectl patch secret biblioteca-secrets -n biblioteca --type merge -p $patch
-kubectl rollout restart deployment/identity-service deployment/catalog-service -n biblioteca
-kubectl rollout status deployment/identity-service -n biblioteca --timeout=420s
-kubectl rollout status deployment/catalog-service -n biblioteca --timeout=420s
-```
-
-Verifica que el Secret tenga todas las llaves requeridas sin imprimir sus valores:
-
-```powershell
-kubectl get secret biblioteca-secrets -n biblioteca -o json |
-  ConvertFrom-Json |
-  Select-Object -ExpandProperty data |
-  Get-Member -MemberType NoteProperty |
-  Select-Object -ExpandProperty Name
-```
+Azure Managed Redis y Service Bus no tienen modo stop equivalente. Si la demo termino y quieres gastar lo minimo, elimina esos recursos y recrealos con la guia `MANAGED_DATA_AZURE.md`.

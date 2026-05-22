@@ -83,15 +83,19 @@ jobs:
           AKS_CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
           ACR_NAME: ${{ vars.ACR_NAME }}
           ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          POSTGRES_HOST: ${{ vars.POSTGRES_HOST }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          AZURE_SERVICE_BUS_CONNECTION_STRING: ${{ secrets.AZURE_SERVICE_BUS_CONNECTION_STRING }}
         run: |
           missing=0
-          for name in AKS_RESOURCE_GROUP AKS_CLUSTER_NAME ACR_NAME ACR_LOGIN_SERVER AZURE_CREDENTIALS POSTGRES_PASSWORD HF_API_TOKEN GEMINI_API_KEY GROQ_API_KEY OPENROUTER_API_KEY; do
+          for name in AKS_RESOURCE_GROUP AKS_CLUSTER_NAME ACR_NAME ACR_LOGIN_SERVER POSTGRES_HOST POSTGRES_USER AZURE_CREDENTIALS POSTGRES_PASSWORD HF_API_TOKEN GEMINI_API_KEY GROQ_API_KEY OPENROUTER_API_KEY REDIS_URL AZURE_SERVICE_BUS_CONNECTION_STRING; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required for backend deployment"
               missing=1
@@ -144,12 +148,19 @@ jobs:
             --from-literal=GEMINI_API_KEY='${{ secrets.GEMINI_API_KEY }}' \
             --from-literal=GROQ_API_KEY='${{ secrets.GROQ_API_KEY }}' \
             --from-literal=OPENROUTER_API_KEY='${{ secrets.OPENROUTER_API_KEY }}' \
+            --from-literal=REDIS_URL='${{ secrets.REDIS_URL }}' \
             --from-literal=AZURE_SERVICE_BUS_CONNECTION_STRING='${{ secrets.AZURE_SERVICE_BUS_CONNECTION_STRING }}' \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Render backend manifests for this release
         env:
           PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL || 'http://52.158.169.2' }}
+          POSTGRES_HOST: ${{ vars.POSTGRES_HOST }}
+          POSTGRES_PORT: ${{ vars.POSTGRES_PORT || '5432' }}
+          POSTGRES_DB: ${{ vars.POSTGRES_DB || 'catalog_db' }}
+          POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+          DB_SSL: ${{ vars.DB_SSL || 'true' }}
+          AZURE_SERVICE_BUS_QUEUE: ${{ vars.AZURE_SERVICE_BUS_QUEUE || 'library-logging-queue' }}
         run: |
           MANIFEST=/tmp/backend-rendered.yaml
           kubectl kustomize "$KUSTOMIZE_OVERLAY" > "$MANIFEST"
@@ -160,14 +171,20 @@ jobs:
             sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_BASE_URL|" "$MANIFEST"
             sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: $PUBLIC_BASE_URL|" "$MANIFEST"
           fi
+          sed -i "s|POSTGRES_DB: .*|POSTGRES_DB: $POSTGRES_DB|" "$MANIFEST"
+          sed -i "s|POSTGRES_USER: .*|POSTGRES_USER: $POSTGRES_USER|" "$MANIFEST"
+          sed -i "s|DB_HOST: .*|DB_HOST: $POSTGRES_HOST|" "$MANIFEST"
+          sed -i "s|DB_PORT: .*|DB_PORT: $POSTGRES_PORT|" "$MANIFEST"
+          sed -i "s|DB_NAME: .*|DB_NAME: $POSTGRES_DB|" "$MANIFEST"
+          sed -i "s|DB_USER: .*|DB_USER: $POSTGRES_USER|" "$MANIFEST"
+          sed -i "s|DB_SSL: .*|DB_SSL: $DB_SSL|" "$MANIFEST"
+          sed -i "s|AZURE_SERVICE_BUS_QUEUE: .*|AZURE_SERVICE_BUS_QUEUE: $AZURE_SERVICE_BUS_QUEUE|" "$MANIFEST"
 
       - name: Deploy backend manifests
         run: kubectl apply -f /tmp/backend-rendered.yaml
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/postgres --namespace "$NAMESPACE" --timeout=420s
-          kubectl rollout status deployment/rabbitmq --namespace "$NAMESPACE" --timeout=420s
           kubectl rollout status deployment/identity-service --namespace "$NAMESPACE" --timeout=420s
           kubectl rollout status deployment/catalog-service --namespace "$NAMESPACE" --timeout=420s
           kubectl rollout status deployment/chatbot-service --namespace "$NAMESPACE" --timeout=240s

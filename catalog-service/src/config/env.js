@@ -41,6 +41,10 @@ if (missingEnvVars.length > 0) {
   );
 }
 
+const parseBoolean = (value) => ['1', 'true', 'yes', 'require', 'required'].includes(
+  String(value || '').trim().toLowerCase()
+);
+
 export const config = {
   port: parseInt(process.env.PORT, 10),
   database: {
@@ -49,7 +53,8 @@ export const config = {
     database: process.env.DB_NAME,
     username: process.env.DB_USER,
     password: process.env.DB_PASSWORD || '',
-    dialect: 'postgres'
+    dialect: 'postgres',
+    ssl: parseBoolean(process.env.DB_SSL)
   },
   authServiceUrl: process.env.AUTH_SERVICE_URL,
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:4173')

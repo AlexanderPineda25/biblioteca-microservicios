@@ -4,6 +4,7 @@ using Microsoft.OpenApi;
 using MiniIdentityApi.Application.Interfaces;
 using MiniIdentityApi.Application.Services;
 using MiniIdentityApi.Domain.Entities;
+using MiniIdentityApi.Infrastructure.Data;
 using MiniIdentityApi.Infrastructure.Repositories;
 using MiniIdentityApi.Infrastructure.Security;
 using System.Text;
@@ -93,12 +94,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Ensure PostgreSQL is available and tables exist
-var dbHost = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-var dbPort = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
-var dbName = Environment.GetEnvironmentVariable("DB_NAME") ?? "catalog_db";
-var dbUser = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
-var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? "postgres123";
-var connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUser};Password={dbPassword};Include Error Detail=true";
+var connectionString = PostgresConnectionStringFactory.Create();
 
 Console.WriteLine("Waiting for PostgreSQL connection and initializing schema...");
 for (int i = 0; i < 20; i++)
