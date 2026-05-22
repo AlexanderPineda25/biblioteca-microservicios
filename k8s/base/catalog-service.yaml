@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: catalog-service
-          image: biblioteca/catalog-service:latest
+          image: acrbiblioalex25.azurecr.io/biblioteca/catalog-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3002

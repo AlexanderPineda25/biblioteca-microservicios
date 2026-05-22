@@ -58,7 +58,7 @@ $AKS_NAME="aks-biblioteca-edu"
 $ACR_NAME="acrbiblioalex25"
 $ACR_LOGIN_SERVER="acrbiblioalex25.azurecr.io"
 $INGRESS_IP="52.158.169.2"
-$TAG="aks-20260522-031612"
+$TAG="aks-20260522-063426"
 ```
 
 ## Secretos
@@ -97,28 +97,23 @@ docker push "$ACR/biblioteca/chatbot-service:$TAG"
 
 ## Aplicar manifiestos
 
+Aplica el manifiesto ya renderizado con la imagen final. No apliques primero `latest` y luego `kubectl set image`, porque en AKS Education con un solo nodo eso crea rollouts dobles y puede dejar ReplicaSets viejos ocupando CPU.
+
 ```powershell
+$ACR="acrbiblioalex25.azurecr.io"
+$TAG="aks-20260522-063426"
 $INGRESS_IP="52.158.169.2"
+$PUBLIC_BASE_URL="http://52.158.169.2"
 
-kubectl apply -k k8s/overlays/aks-no-domain
-
-$patchFile = New-TemporaryFile
-'{"data":{"CORS_ORIGINS":"http://52.158.169.2","OPENROUTER_REFERER":"http://52.158.169.2"}}' |
-  Set-Content -Path $patchFile -Encoding ascii
-kubectl patch configmap biblioteca-config -n biblioteca --type merge --patch-file $patchFile
-Remove-Item -LiteralPath $patchFile -Force
-
-kubectl set image deployment/identity-service `
-  identity-service="$ACR/biblioteca/identity-service:$TAG" `
-  -n biblioteca
-
-kubectl set image deployment/catalog-service `
-  catalog-service="$ACR/biblioteca/catalog-service:$TAG" `
-  -n biblioteca
-
-kubectl set image deployment/chatbot-service `
-  chatbot-service="$ACR/biblioteca/chatbot-service:$TAG" `
-  -n biblioteca
+kubectl kustomize k8s/overlays/aks-no-domain |
+  ForEach-Object {
+    $_ -replace 'image: .*identity-service:.*', "image: $ACR/biblioteca/identity-service:$TAG" `
+       -replace 'image: .*catalog-service:.*', "image: $ACR/biblioteca/catalog-service:$TAG" `
+       -replace 'image: .*chatbot-service:.*', "image: $ACR/biblioteca/chatbot-service:$TAG" `
+       -replace 'CORS_ORIGINS: .*', "CORS_ORIGINS: $PUBLIC_BASE_URL" `
+       -replace 'OPENROUTER_REFERER: .*', "OPENROUTER_REFERER: $PUBLIC_BASE_URL"
+  } |
+  kubectl apply -f -
 ```
 
 ## Verificacion
@@ -175,3 +170,49 @@ foreach ($app in @("postgres","rabbitmq","identity-service","catalog-service","c
 ```
 
 Luego aplica de nuevo el overlay y sube las imagenes correctas. Los manifiestos usan `strategy: Recreate` en backend para evitar duplicar pods durante upgrades en nodos pequenos. PostgreSQL usa `PGDATA=/var/lib/postgresql/data/pgdata` para funcionar con Azure Disk, que crea `lost+found` en la raiz del volumen.
+
+## Reparar errores comunes
+
+### `InvalidImageName`
+
+Esto ocurre cuando el campo `image` del Deployment contiene texto que no es una referencia Docker valida. En este proyecto paso al capturar por error logs de `docker build/push` dentro del valor de imagen. Solucion:
+
+```powershell
+$ACR="acrbiblioalex25.azurecr.io"
+$TAG="aks-20260522-063426"
+$PUBLIC_BASE_URL="http://52.158.169.2"
+
+kubectl kustomize k8s/overlays/aks-no-domain |
+  ForEach-Object {
+    $_ -replace 'image: .*identity-service:.*', "image: $ACR/biblioteca/identity-service:$TAG" `
+       -replace 'image: .*catalog-service:.*', "image: $ACR/biblioteca/catalog-service:$TAG" `
+       -replace 'image: .*chatbot-service:.*', "image: $ACR/biblioteca/chatbot-service:$TAG" `
+       -replace 'CORS_ORIGINS: .*', "CORS_ORIGINS: $PUBLIC_BASE_URL" `
+       -replace 'OPENROUTER_REFERER: .*', "OPENROUTER_REFERER: $PUBLIC_BASE_URL"
+  } |
+  kubectl apply -f -
+```
+
+### `CreateContainerConfigError` por `POSTGRES_PASSWORD`
+
+Si `kubectl describe pod` muestra `couldn't find key POSTGRES_PASSWORD in Secret biblioteca/biblioteca-secrets`, el Secret fue creado o sobrescrito incompleto. Repara solo la llave faltante para no borrar las llaves de IA:
+
+```powershell
+$postgresPasswordB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("postgres123"))
+$patch = @{ data = @{ POSTGRES_PASSWORD = $postgresPasswordB64 } } | ConvertTo-Json -Compress
+
+kubectl patch secret biblioteca-secrets -n biblioteca --type merge -p $patch
+kubectl rollout restart deployment/identity-service deployment/catalog-service -n biblioteca
+kubectl rollout status deployment/identity-service -n biblioteca --timeout=420s
+kubectl rollout status deployment/catalog-service -n biblioteca --timeout=420s
+```
+
+Verifica que el Secret tenga todas las llaves requeridas sin imprimir sus valores:
+
+```powershell
+kubectl get secret biblioteca-secrets -n biblioteca -o json |
+  ConvertFrom-Json |
+  Select-Object -ExpandProperty data |
+  Get-Member -MemberType NoteProperty |
+  Select-Object -ExpandProperty Name
+```

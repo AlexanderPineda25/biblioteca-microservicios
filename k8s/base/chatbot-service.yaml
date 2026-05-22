@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: chatbot-service
-          image: biblioteca/chatbot-service:latest
+          image: acrbiblioalex25.azurecr.io/biblioteca/chatbot-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3003

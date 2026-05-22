@@ -60,7 +60,7 @@ Pipeline:
 .github/workflows/backend-aks-ci-cd.yml
 ```
 
-El pipeline despliega `identity-service`, `catalog-service` y `chatbot-service` de manera independiente con `kubectl set image`.
+El pipeline despliega `identity-service`, `catalog-service` y `chatbot-service` con manifiestos renderizados por release, usando imagenes `ACR_LOGIN_SERVER/biblioteca/<servicio>:<sha>` y evitando rollouts intermedios.
 
 Despliegue AKS verificado:
 

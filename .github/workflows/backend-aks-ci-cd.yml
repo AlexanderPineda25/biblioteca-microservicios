@@ -71,11 +71,35 @@ jobs:
     name: Build images and deploy to AKS
     runs-on: ubuntu-latest
     needs: validate
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Check deployment configuration
+        env:
+          AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
+          AKS_CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          missing=0
+          for name in AKS_RESOURCE_GROUP AKS_CLUSTER_NAME ACR_NAME ACR_LOGIN_SERVER AZURE_CREDENTIALS POSTGRES_PASSWORD HF_API_TOKEN GEMINI_API_KEY GROQ_API_KEY OPENROUTER_API_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required for backend deployment"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Azure login
         uses: azure/login@v2
@@ -123,31 +147,22 @@ jobs:
             --from-literal=AZURE_SERVICE_BUS_CONNECTION_STRING='${{ secrets.AZURE_SERVICE_BUS_CONNECTION_STRING }}' \
             --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Deploy backend manifests
-        run: kubectl apply -k "$KUSTOMIZE_OVERLAY"
-
-      - name: Patch public URL config
+      - name: Render backend manifests for this release
         env:
-          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL || 'http://52.158.169.2' }}
         run: |
+          MANIFEST=/tmp/backend-rendered.yaml
+          kubectl kustomize "$KUSTOMIZE_OVERLAY" > "$MANIFEST"
+          sed -i "s|image: .*identity-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}|" "$MANIFEST"
+          sed -i "s|image: .*catalog-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}|" "$MANIFEST"
+          sed -i "s|image: .*chatbot-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}|" "$MANIFEST"
           if [ -n "$PUBLIC_BASE_URL" ]; then
-            kubectl patch configmap biblioteca-config \
-              --namespace "$NAMESPACE" \
-              --type merge \
-              --patch "{\"data\":{\"CORS_ORIGINS\":\"$PUBLIC_BASE_URL\",\"OPENROUTER_REFERER\":\"$PUBLIC_BASE_URL\"}}"
+            sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_BASE_URL|" "$MANIFEST"
+            sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: $PUBLIC_BASE_URL|" "$MANIFEST"
           fi
 
-      - name: Update backend images
-        run: |
-          kubectl set image deployment/identity-service \
-            identity-service="${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}" \
-            --namespace "$NAMESPACE"
-          kubectl set image deployment/catalog-service \
-            catalog-service="${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}" \
-            --namespace "$NAMESPACE"
-          kubectl set image deployment/chatbot-service \
-            chatbot-service="${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}" \
-            --namespace "$NAMESPACE"
+      - name: Deploy backend manifests
+        run: kubectl apply -f /tmp/backend-rendered.yaml
 
       - name: Wait for rollout
         run: |

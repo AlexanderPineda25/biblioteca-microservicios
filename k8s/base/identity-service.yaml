@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: identity-service
-          image: biblioteca/identity-service:latest
+          image: acrbiblioalex25.azurecr.io/biblioteca/identity-service:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5132
