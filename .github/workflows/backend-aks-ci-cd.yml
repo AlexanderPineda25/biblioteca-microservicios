@@ -225,6 +225,13 @@ jobs:
           DB_SSL: ${{ vars.DB_SSL || 'true' }}
           AZURE_SERVICE_BUS_QUEUE: ${{ vars.AZURE_SERVICE_BUS_QUEUE || 'library-logging-queue' }}
         run: |
+          PG_HOST="$(printf '%s' "$POSTGRES_HOST" | tr -d '\n\r')"
+          PG_USER="$(printf '%s' "$POSTGRES_USER" | tr -d '\n\r')"
+          PG_DB="$(printf '%s' "$POSTGRES_DB" | tr -d '\n\r')"
+          PG_PORT="$(printf '%s' "$POSTGRES_PORT" | tr -d '\n\r')"
+          DB_SSL_CLEAN="$(printf '%s' "$DB_SSL" | tr -d '\n\r')"
+          SB_QUEUE="$(printf '%s' "$AZURE_SERVICE_BUS_QUEUE" | tr -d '\n\r')"
+
           OVERLAY="$(printf '%s' "$KUSTOMIZE_OVERLAY" | tr -d '\n\r')"
           echo "Using overlay: '$OVERLAY'"
           MANIFEST=/tmp/backend-rendered.yaml
@@ -238,14 +245,14 @@ jobs:
             sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_URL|" "$MANIFEST"
             sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: $PUBLIC_URL|" "$MANIFEST"
           fi
-          sed -i "s|POSTGRES_DB: .*|POSTGRES_DB: $POSTGRES_DB|" "$MANIFEST"
-          sed -i "s|POSTGRES_USER: .*|POSTGRES_USER: $POSTGRES_USER|" "$MANIFEST"
-          sed -i "s|DB_HOST: .*|DB_HOST: $POSTGRES_HOST|" "$MANIFEST"
-          sed -i "s|DB_PORT: .*|DB_PORT: $POSTGRES_PORT|" "$MANIFEST"
-          sed -i "s|DB_NAME: .*|DB_NAME: $POSTGRES_DB|" "$MANIFEST"
-          sed -i "s|DB_USER: .*|DB_USER: $POSTGRES_USER|" "$MANIFEST"
-          sed -i "s|DB_SSL: .*|DB_SSL: $DB_SSL|" "$MANIFEST"
-          sed -i "s|AZURE_SERVICE_BUS_QUEUE: .*|AZURE_SERVICE_BUS_QUEUE: $AZURE_SERVICE_BUS_QUEUE|" "$MANIFEST"
+          sed -i "s|POSTGRES_DB: .*|POSTGRES_DB: $PG_DB|" "$MANIFEST"
+          sed -i "s|POSTGRES_USER: .*|POSTGRES_USER: $PG_USER|" "$MANIFEST"
+          sed -i "s|DB_HOST: .*|DB_HOST: $PG_HOST|" "$MANIFEST"
+          sed -i "s|DB_PORT: .*|DB_PORT: $PG_PORT|" "$MANIFEST"
+          sed -i "s|DB_NAME: .*|DB_NAME: $PG_DB|" "$MANIFEST"
+          sed -i "s|DB_USER: .*|DB_USER: $PG_USER|" "$MANIFEST"
+          sed -i "s|DB_SSL: .*|DB_SSL: $DB_SSL_CLEAN|" "$MANIFEST"
+          sed -i "s|AZURE_SERVICE_BUS_QUEUE: .*|AZURE_SERVICE_BUS_QUEUE: $SB_QUEUE|" "$MANIFEST"
 
       - name: Deploy backend manifests
         run: kubectl apply -f /tmp/backend-rendered.yaml
