@@ -9,7 +9,7 @@ on:
 
 env:
   NAMESPACE: biblioteca
-  KUSTOMIZE_OVERLAY: k8s/overlays/aks-no-domain
+  KUSTOMIZE_OVERLAY: ${{ vars.KUSTOMIZE_OVERLAY || 'k8s/overlays/aks-no-domain' }}
   IDENTITY_IMAGE: biblioteca/identity-service
   CATALOG_IMAGE: biblioteca/catalog-service
   CHATBOT_IMAGE: biblioteca/chatbot-service
@@ -205,7 +205,7 @@ jobs:
 
       - name: Render backend manifests for this release
         env:
-          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL || 'http://52.158.169.2' }}
+          PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL || 'https://bibliotechu.duckdns.org' }}
           POSTGRES_HOST: ${{ vars.POSTGRES_HOST }}
           POSTGRES_PORT: ${{ vars.POSTGRES_PORT || '5432' }}
           POSTGRES_DB: ${{ vars.POSTGRES_DB || 'catalog_db' }}
@@ -239,3 +239,78 @@ jobs:
           kubectl rollout status deployment/identity-service --namespace "$NAMESPACE" --timeout=420s
           kubectl rollout status deployment/catalog-service --namespace "$NAMESPACE" --timeout=420s
           kubectl rollout status deployment/chatbot-service --namespace "$NAMESPACE" --timeout=240s
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Rollout failed. Initiating rollback..."
+          kubectl rollout undo deployment/identity-service --namespace "$NAMESPACE" 2>/dev/null || true
+          kubectl rollout undo deployment/catalog-service --namespace "$NAMESPACE" 2>/dev/null || true
+          kubectl rollout undo deployment/chatbot-service --namespace "$NAMESPACE" 2>/dev/null || true
+          echo "⏳ Waiting for rollback to complete..."
+          kubectl rollout status deployment/identity-service --namespace "$NAMESPACE" --timeout=300s 2>/dev/null || true
+          kubectl rollout status deployment/catalog-service --namespace "$NAMESPACE" --timeout=300s 2>/dev/null || true
+          kubectl rollout status deployment/chatbot-service --namespace "$NAMESPACE" --timeout=300s 2>/dev/null || true
+          echo "✅ Rollback completed (or attempted) for all services"
+          # Notify about rollback
+          echo "ROLLBACK_TRIGGERED=true" >> $GITHUB_ENV
+
+      - name: Health check post-deploy
+        run: |
+          echo "Waiting for services to be ready..."
+          sleep 15
+          PUBLIC_URL="${{ vars.PUBLIC_BASE_URL || 'https://bibliotechu.duckdns.org' }}"
+          endpoints=(
+            "$PUBLIC_URL/health"
+            "$PUBLIC_URL/api/catalog/health"
+            "$PUBLIC_URL/api/chatbot/health"
+          )
+          all_passed=true
+          for endpoint in "${endpoints[@]}"; do
+            for i in {1..12}; do
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$endpoint" 2>/dev/null || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ $endpoint (HTTP $HTTP_CODE)"
+                break
+              fi
+              echo "  Attempt $i: $endpoint → HTTP $HTTP_CODE, retrying..."
+              sleep 10
+            done
+            # After all retries, check one last time
+            FINAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$endpoint" 2>/dev/null || echo "000")
+            if [ "$FINAL_CODE" != "200" ]; then
+              echo "❌ $endpoint failed after retries (HTTP $FINAL_CODE)"
+              all_passed=false
+            fi
+          done
+          if [ "$all_passed" = false ]; then
+            echo "❌ Some health checks failed. Consider manual rollback:"
+            echo "   .\\azure\\rollback.ps1"
+            exit 1
+          fi
+          echo "✅ All health checks passed"
+
+      - name: Initialize database (if needed)
+        run: |
+          INIT_SQL_PATH="./init.sql"
+          if [ ! -f "$INIT_SQL_PATH" ]; then
+            echo "init.sql not found at $INIT_SQL_PATH, skipping DB initialization"
+            exit 0
+          fi
+          # Find postgres pod
+          PG_POD=$(kubectl get pods -n "$NAMESPACE" -l app=postgresql -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+          if [ -z "$PG_POD" ]; then
+            echo "No in-cluster PostgreSQL pod found. Database is managed externally (Azure DB for PostgreSQL)."
+            echo "Skipping init.sql execution (run manually via psql or Azure portal)."
+            exit 0
+          fi
+          # Check if database is empty
+          TABLE_COUNT=$(kubectl exec -n "$NAMESPACE" "$PG_POD" -- psql -U postgres -t -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';" 2>/dev/null | xargs)
+          if [ "$TABLE_COUNT" -gt 0 ] 2>/dev/null; then
+            echo "Database already has $TABLE_COUNT tables. Skipping initialization."
+            exit 0
+          fi
+          echo "Initializing database with init.sql..."
+          kubectl cp "$INIT_SQL_PATH" "$NAMESPACE/$PG_POD:/tmp/init.sql" --container=postgresql 2>/dev/null
+          kubectl exec -n "$NAMESPACE" "$PG_POD" -- psql -U postgres -f /tmp/init.sql
+          echo "✅ Database initialized successfully"

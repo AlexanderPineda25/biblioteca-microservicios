@@ -3,5 +3,5 @@ kind: ConfigMap
 metadata:
   name: biblioteca-config
 data:
-  CORS_ORIGINS: "https://biblioteca.example.com,http://biblioteca.example.com"
-  OPENROUTER_REFERER: "https://biblioteca.example.com"
+  CORS_ORIGINS: "https://bibliotechu.duckdns.org,http://bibliotechu.duckdns.org"
+  OPENROUTER_REFERER: "https://bibliotechu.duckdns.org"
