@@ -66,7 +66,7 @@ jobs:
 
       - name: Render Kustomize
         run: |
-          OVERLAY="$(echo "$KUSTOMIZE_OVERLAY" | xargs)"
+          OVERLAY="$(printf '%s' "$KUSTOMIZE_OVERLAY" | tr -d '\n\r')"
           echo "Using overlay: '$OVERLAY'"
           kubectl kustomize "$OVERLAY" > /tmp/backend-rendered.yaml
 
@@ -216,14 +216,14 @@ jobs:
           DB_SSL: ${{ vars.DB_SSL || 'true' }}
           AZURE_SERVICE_BUS_QUEUE: ${{ vars.AZURE_SERVICE_BUS_QUEUE || 'library-logging-queue' }}
         run: |
-          OVERLAY="$(echo "$KUSTOMIZE_OVERLAY" | xargs)"
+          OVERLAY="$(printf '%s' "$KUSTOMIZE_OVERLAY" | tr -d '\n\r')"
           echo "Using overlay: '$OVERLAY'"
           MANIFEST=/tmp/backend-rendered.yaml
           kubectl kustomize "$OVERLAY" > "$MANIFEST"
           sed -i "s|image: .*identity-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}|" "$MANIFEST"
           sed -i "s|image: .*catalog-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}|" "$MANIFEST"
           sed -i "s|image: .*chatbot-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}|" "$MANIFEST"
-          PUBLIC_URL="$(echo "$PUBLIC_BASE_URL" | xargs)"
+          PUBLIC_URL="$(printf '%s' "$PUBLIC_BASE_URL" | tr -d '\n\r')"
           if [ -n "$PUBLIC_URL" ]; then
             echo "Using PUBLIC_URL: '$PUBLIC_URL'"
             sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_URL|" "$MANIFEST"
@@ -266,7 +266,7 @@ jobs:
         run: |
           echo "Waiting for services to be ready..."
           sleep 15
-          PUBLIC_URL="$(echo "${{ vars.PUBLIC_BASE_URL || 'https://bibliotechu.duckdns.org' }}" | xargs)"
+          PUBLIC_URL="$(printf '%s' "${{ vars.PUBLIC_BASE_URL || 'https://bibliotechu.duckdns.org' }}" | tr -d '\n\r')"
           endpoints=(
             "$PUBLIC_URL/health"
             "$PUBLIC_URL/api/catalog/health"
