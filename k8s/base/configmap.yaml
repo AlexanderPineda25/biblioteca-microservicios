@@ -7,7 +7,7 @@ metadata:
 data:
   ASPNETCORE_ENVIRONMENT: "Production"
   ASPNETCORE_URLS: "http://+:5132"
-  CORS_ORIGINS: "http://bibliotechu.duckdns.org/,http://bibliotechu.duckdns.org"
+  CORS_ORIGINS: "https://bibliotechu.duckdns.org"
 
   POSTGRES_DB: "catalog_db"
   POSTGRES_USER: "biblioadmin"
@@ -27,7 +27,7 @@ data:
   GEMINI_MODEL: "gemini-2.5-flash"
   GROQ_MODEL: "llama-3.1-8b-instant"
   OPENROUTER_MODEL: "mistralai/mistral-7b-instruct:free"
-  OPENROUTER_REFERER: "http://bibliotechu.duckdns.org"
+  OPENROUTER_REFERER: "https://bibliotechu.duckdns.org"
   OPENROUTER_TITLE: "Biblioteca U"
 
   RABBITMQ_URL: ""
