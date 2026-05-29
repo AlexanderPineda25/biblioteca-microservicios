@@ -65,7 +65,10 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Render Kustomize
-        run: kubectl kustomize "$KUSTOMIZE_OVERLAY" > /tmp/backend-rendered.yaml
+        run: |
+          OVERLAY="$(echo "$KUSTOMIZE_OVERLAY" | xargs)"
+          echo "Using overlay: '$OVERLAY'"
+          kubectl kustomize "$OVERLAY" > /tmp/backend-rendered.yaml
 
   deployment-config:
     name: Check AKS deployment configuration
@@ -213,14 +216,18 @@ jobs:
           DB_SSL: ${{ vars.DB_SSL || 'true' }}
           AZURE_SERVICE_BUS_QUEUE: ${{ vars.AZURE_SERVICE_BUS_QUEUE || 'library-logging-queue' }}
         run: |
+          OVERLAY="$(echo "$KUSTOMIZE_OVERLAY" | xargs)"
+          echo "Using overlay: '$OVERLAY'"
           MANIFEST=/tmp/backend-rendered.yaml
-          kubectl kustomize "$KUSTOMIZE_OVERLAY" > "$MANIFEST"
+          kubectl kustomize "$OVERLAY" > "$MANIFEST"
           sed -i "s|image: .*identity-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}|" "$MANIFEST"
           sed -i "s|image: .*catalog-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}|" "$MANIFEST"
           sed -i "s|image: .*chatbot-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}|" "$MANIFEST"
-          if [ -n "$PUBLIC_BASE_URL" ]; then
-            sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_BASE_URL|" "$MANIFEST"
-            sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: $PUBLIC_BASE_URL|" "$MANIFEST"
+          PUBLIC_URL="$(echo "$PUBLIC_BASE_URL" | xargs)"
+          if [ -n "$PUBLIC_URL" ]; then
+            echo "Using PUBLIC_URL: '$PUBLIC_URL'"
+            sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_URL|" "$MANIFEST"
+            sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: $PUBLIC_URL|" "$MANIFEST"
           fi
           sed -i "s|POSTGRES_DB: .*|POSTGRES_DB: $POSTGRES_DB|" "$MANIFEST"
           sed -i "s|POSTGRES_USER: .*|POSTGRES_USER: $POSTGRES_USER|" "$MANIFEST"
@@ -259,7 +266,7 @@ jobs:
         run: |
           echo "Waiting for services to be ready..."
           sleep 15
-          PUBLIC_URL="${{ vars.PUBLIC_BASE_URL || 'https://bibliotechu.duckdns.org' }}"
+          PUBLIC_URL="$(echo "${{ vars.PUBLIC_BASE_URL || 'https://bibliotechu.duckdns.org' }}" | xargs)"
           endpoints=(
             "$PUBLIC_URL/health"
             "$PUBLIC_URL/api/catalog/health"
