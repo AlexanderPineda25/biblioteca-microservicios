@@ -19,25 +19,43 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public IActionResult Register([FromBody] RegisterRequest request)
     {
-        _authenticationService.Register(request);
-        return StatusCode(StatusCodes.Status201Created, new { message = "User registered successfully." });
+        try
+        {
+            _authenticationService.Register(request);
+            return StatusCode(StatusCodes.Status201Created, new { message = "User registered successfully." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
     [HttpPost("login")]
     public ActionResult<AuthResponse> Login([FromBody] LoginRequest request)
     {
-        var response = _authenticationService.Login(request);
-
-        var cookieOptions = new CookieOptions
+        try
         {
-            HttpOnly = true,
-            Secure = Request.IsHttps || (Request.Headers["X-Forwarded-Proto"] == "https"),
-            SameSite = SameSiteMode.Lax,
-            MaxAge = TimeSpan.FromHours(1)
-        };
+            var response = _authenticationService.Login(request);
 
-        Response.Cookies.Append("access_token", response.AccessToken, cookieOptions);
-        return Ok(response);
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = Request.IsHttps || (Request.Headers["X-Forwarded-Proto"] == "https"),
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromHours(1)
+            };
+
+            Response.Cookies.Append("access_token", response.AccessToken, cookieOptions);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { error = ex.Message });
+        }
     }
 
     [HttpPost("logout")]
