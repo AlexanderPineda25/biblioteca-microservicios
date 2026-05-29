@@ -131,6 +131,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set trimmed environment variables
+        run: |
+          echo "CLEAN_ACR_LOGIN=$(printf '%s' '${{ vars.ACR_LOGIN_SERVER }}' | tr -d '\n\r')" >> $GITHUB_ENV
+          echo "CLEAN_ACR_NAME=$(printf '%s' '${{ vars.ACR_NAME }}' | tr -d '\n\r')" >> $GITHUB_ENV
+          echo "CLEAN_RG=$(printf '%s' '${{ vars.AKS_RESOURCE_GROUP }}' | tr -d '\n\r')" >> $GITHUB_ENV
+          echo "CLEAN_CLUSTER=$(printf '%s' '${{ vars.AKS_CLUSTER_NAME }}' | tr -d '\n\r')" >> $GITHUB_ENV
+          echo "CLEAN_PG_HOST=$(printf '%s' '${{ vars.POSTGRES_HOST }}' | tr -d '\n\r')" >> $GITHUB_ENV
+          echo "CLEAN_PG_USER=$(printf '%s' '${{ vars.POSTGRES_USER }}' | tr -d '\n\r')" >> $GITHUB_ENV
+
       - name: Check deployment configuration
         env:
           AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
@@ -165,31 +174,31 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Login to Azure Container Registry
-        run: az acr login --name "${{ vars.ACR_NAME }}"
+        run: az acr login --name "$CLEAN_ACR_NAME"
 
       - name: Build and push identity image
         run: |
-          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}"
+          IMAGE="${CLEAN_ACR_LOGIN}/${IDENTITY_IMAGE}:${{ github.sha }}"
           docker build -t "$IMAGE" ./mini-identity-api-dotnet-main/mini-identity-api-dotnet-main
           docker push "$IMAGE"
 
       - name: Build and push catalog image
         run: |
-          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}"
+          IMAGE="${CLEAN_ACR_LOGIN}/${CATALOG_IMAGE}:${{ github.sha }}"
           docker build -t "$IMAGE" ./catalog-service
           docker push "$IMAGE"
 
       - name: Build and push chatbot image
         run: |
-          IMAGE="${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}"
+          IMAGE="${CLEAN_ACR_LOGIN}/${CHATBOT_IMAGE}:${{ github.sha }}"
           docker build -t "$IMAGE" ./chatbot-service
           docker push "$IMAGE"
 
       - name: Get AKS credentials
         run: |
           az aks get-credentials \
-            --resource-group "${{ vars.AKS_RESOURCE_GROUP }}" \
-            --name "${{ vars.AKS_CLUSTER_NAME }}" \
+            --resource-group "$CLEAN_RG" \
+            --name "$CLEAN_CLUSTER" \
             --overwrite-existing
 
       - name: Create namespace and secrets
@@ -220,9 +229,9 @@ jobs:
           echo "Using overlay: '$OVERLAY'"
           MANIFEST=/tmp/backend-rendered.yaml
           kubectl kustomize "$OVERLAY" > "$MANIFEST"
-          sed -i "s|image: .*identity-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${IDENTITY_IMAGE}:${{ github.sha }}|" "$MANIFEST"
-          sed -i "s|image: .*catalog-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CATALOG_IMAGE}:${{ github.sha }}|" "$MANIFEST"
-          sed -i "s|image: .*chatbot-service:.*|image: ${{ vars.ACR_LOGIN_SERVER }}/${CHATBOT_IMAGE}:${{ github.sha }}|" "$MANIFEST"
+          sed -i "s|image: .*identity-service:.*|image: ${CLEAN_ACR_LOGIN}/${IDENTITY_IMAGE}:${{ github.sha }}|" "$MANIFEST"
+          sed -i "s|image: .*catalog-service:.*|image: ${CLEAN_ACR_LOGIN}/${CATALOG_IMAGE}:${{ github.sha }}|" "$MANIFEST"
+          sed -i "s|image: .*chatbot-service:.*|image: ${CLEAN_ACR_LOGIN}/${CHATBOT_IMAGE}:${{ github.sha }}|" "$MANIFEST"
           PUBLIC_URL="$(printf '%s' "$PUBLIC_BASE_URL" | tr -d '\n\r')"
           if [ -n "$PUBLIC_URL" ]; then
             echo "Using PUBLIC_URL: '$PUBLIC_URL'"
