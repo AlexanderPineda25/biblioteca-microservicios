@@ -29,7 +29,8 @@ const requiredEnvVars = [
   'DB_PORT',
   'DB_NAME',
   'DB_USER',
-  'AUTH_SERVICE_URL'
+  'AUTH_SERVICE_URL',
+  'AZURE_SERVICE_BUS_CONNECTION_STRING'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
@@ -72,9 +73,8 @@ export const config = {
     openRouterApiKey: process.env.OPENROUTER_API_KEY || ''
   },
   messaging: {
-    azureServiceBusConnectionString: process.env.AZURE_SERVICE_BUS_CONNECTION_STRING || '',
-    azureServiceBusQueue: process.env.AZURE_SERVICE_BUS_QUEUE || 'library-logging-queue',
-    rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://rabbitmq:5672'
+    azureServiceBusConnectionString: process.env.AZURE_SERVICE_BUS_CONNECTION_STRING,
+    azureServiceBusQueue: process.env.AZURE_SERVICE_BUS_QUEUE || 'library-logging-queue'
   },
   nodeEnv: process.env.NODE_ENV || 'development'
 };

@@ -1,6 +1,6 @@
 import { BookService } from '../services/book.service.js';
 import { AiService } from '../services/ai.service.js';
-import { RabbitMqService } from '../services/rabbitmq.service.js';
+import { bookEventBus } from '../observers/BookEventBus.js';
 import { validationResult } from 'express-validator';
 
 const handleValidationErrors = (req, res) => {
@@ -82,14 +82,7 @@ export class BookController {
       handleValidationErrors(req, res);
 
       const book = await BookService.createBook(req.body);
-
-      // Publish event to RabbitMQ
-      await RabbitMqService.publishEvent('book.created', {
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        isbn: book.isbn
-      });
+      bookEventBus.emitBookCreated(book);
 
       res.status(201).json({
         success: true,
@@ -105,6 +98,7 @@ export class BookController {
       handleValidationErrors(req, res);
 
       const book = await BookService.updateBook(req.params.id, req.body);
+      bookEventBus.emitBookUpdated(book);
 
       res.json({
         success: true,
@@ -120,6 +114,7 @@ export class BookController {
       handleValidationErrors(req, res);
 
       const book = await BookService.deleteBook(req.params.id);
+      bookEventBus.emitBookDeleted(book);
 
       res.json({
         success: true,
@@ -162,9 +157,7 @@ export class BookController {
         interest: req.body.interest,
         books: result.data
       });
-
-      // Publish event to RabbitMQ
-      await RabbitMqService.publishEvent('book.recommended', {
+      bookEventBus.emitBookRecommended({
         interest: req.body.interest,
         recommendation: recommendation.recommendation,
         model: recommendation.model,

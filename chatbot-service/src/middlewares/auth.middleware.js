@@ -2,16 +2,20 @@ import { AuthService } from '../services/auth.service.js';
 
 export const authMiddleware = async (req, res, next) => {
   try {
+    let token = null;
     const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.cookies && req.cookies.access_token) {
+      token = req.cookies.access_token;
+    }
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
       return res.status(401).json({
         success: false,
         error: 'Missing or invalid authorization header'
       });
     }
-
-    const token = authHeader.substring(7);
     const introspectResult = await AuthService.introspectToken(token);
 
     if (!introspectResult.active) {

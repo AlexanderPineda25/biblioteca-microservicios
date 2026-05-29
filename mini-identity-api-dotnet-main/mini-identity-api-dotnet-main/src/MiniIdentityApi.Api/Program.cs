@@ -9,6 +9,7 @@ using MiniIdentityApi.Infrastructure.Repositories;
 using MiniIdentityApi.Infrastructure.Security;
 using System.Text;
 using System.Reflection;
+using MiniIdentityApi.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,7 +88,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(corsOrigins)
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -191,6 +193,7 @@ else
 app.UseSwagger();
 app.UseSwaggerUI();
 
+app.UseCorrelationId();
 
 app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");

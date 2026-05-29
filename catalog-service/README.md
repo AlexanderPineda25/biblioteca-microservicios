@@ -22,7 +22,7 @@ Microservicio de catálogo de libros para Biblioteca U.
 - Filtros por titulo, autor, categoria y disponibilidad.
 - Recomendador IA con Hugging Face.
 - Explicacion conversacional opcional con Gemini, Groq u OpenRouter.
-- Publicacion de eventos en Azure Service Bus en cloud, con RabbitMQ como fallback local.
+- Publicacion de eventos en Azure Service Bus.
 - Proveedor de contexto para `chatbot-service`.
 
 ## Endpoints
@@ -101,18 +101,11 @@ Si el token no esta activo, responde `401`. Si Identity no responde, devuelve `5
 
 ## Mensajeria
 
-En AKS se usa Azure Service Bus:
+Azure Service Bus es el broker de eventos en producción:
 
 ```text
 Namespace: sb-biblioteca-edu-alex25
 Queue: library-logging-queue
-```
-
-En desarrollo local el servicio puede usar RabbitMQ:
-
-```text
-Exchange: library_events
-Queue: library_logging_queue
 ```
 
 Eventos:
@@ -139,7 +132,6 @@ DB_SSL=true
 AUTH_SERVICE_URL=http://identity-service:5132
 AZURE_SERVICE_BUS_CONNECTION_STRING=Endpoint=sb://...
 AZURE_SERVICE_BUS_QUEUE=library-logging-queue
-RABBITMQ_URL=
 HF_API_TOKEN=...
 HF_MODEL=facebook/bart-large-mnli
 CHAT_PROVIDER=gemini

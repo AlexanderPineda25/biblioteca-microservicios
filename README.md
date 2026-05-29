@@ -36,10 +36,7 @@ El compose secundario lee `../.env` para pasar las claves IA a los contenedores.
 
 Documentacion del repo backend:
 
-- Guia AKS: [DEPLOYMENT_AKS.md](DEPLOYMENT_AKS.md)
-- Datos administrados Azure: [MANAGED_DATA_AZURE.md](MANAGED_DATA_AZURE.md)
-- Pipeline CI/CD: [CI_CD.md](CI_CD.md)
-- Tecnologias: [TECHNOLOGIES.md](TECHNOLOGIES.md)
+- Despliegue, CI/CD y datos administrados Azure: [DEPLOYMENT.md](DEPLOYMENT.md)
 
 Manifiestos:
 
@@ -65,7 +62,7 @@ Pipeline:
 
 El pipeline despliega `identity-service`, `catalog-service` y `chatbot-service` con manifiestos renderizados por release, usando imagenes `ACR_LOGIN_SERVER/biblioteca/<servicio>:<sha>` y evitando rollouts intermedios.
 
-AKS cloud es app-only: no despliega Postgres, RabbitMQ ni Redis dentro del cluster. Esos manifests quedan en `k8s/infrastructure/in-cluster` solo para laboratorio o rollback.
+AKS cloud es app-only: no despliega Postgres ni Redis dentro del cluster. Esos manifests quedan en `k8s/infrastructure/in-cluster` solo para laboratorio o rollback.
 
 Despliegue AKS verificado:
 
@@ -161,7 +158,7 @@ Endpoints principales:
 - `POST /api/catalog/books`
 - `POST /api/catalog/books/ai/recommendations`
 
-Eventos RabbitMQ:
+Eventos Azure Service Bus:
 
 - `book.created`.
 - `book.recommended`.

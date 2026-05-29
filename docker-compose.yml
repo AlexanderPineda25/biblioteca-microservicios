@@ -17,21 +17,6 @@ services:
       timeout: 5s
       retries: 5
 
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: biblioteca_rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: biblioteca_redis
@@ -64,14 +49,13 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4173}
       AI_PROVIDER: ${AI_PROVIDER:-huggingface}
       HF_MODEL: ${HF_MODEL:-facebook/bart-large-mnli}
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      AZURE_SERVICE_BUS_CONNECTION_STRING: ${AZURE_SERVICE_BUS_CONNECTION_STRING}
+      AZURE_SERVICE_BUS_QUEUE: ${AZURE_SERVICE_BUS_QUEUE:-library-logging-queue}
     depends_on:
       postgres:
         condition: service_healthy
       identity-service:
         condition: service_started
-      rabbitmq:
-        condition: service_healthy
 
   chatbot-service:
     build: ./chatbot-service
