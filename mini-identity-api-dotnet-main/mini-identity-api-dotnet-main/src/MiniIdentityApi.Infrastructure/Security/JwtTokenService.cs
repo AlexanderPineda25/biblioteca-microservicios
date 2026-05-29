@@ -51,7 +51,10 @@ public class JwtTokenService : ITokenService
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
 
-            var tokenHandler = new JwtSecurityTokenHandler();
+            var tokenHandler = new JwtSecurityTokenHandler
+            {
+                MapInboundClaims = false
+            };
 
             var principal = tokenHandler.ValidateToken(token, new TokenValidationParameters
             {
