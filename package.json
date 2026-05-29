@@ -1,9 +1,0 @@
-{
-  "name": "biblioteca-microservicios",
-  "private": true,
-  "workspaces": [
-    "biblioteca-shared",
-    "catalog-service",
-    "chatbot-service"
-  ]
-}
