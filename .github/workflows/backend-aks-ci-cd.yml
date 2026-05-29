@@ -242,17 +242,17 @@ jobs:
           PUBLIC_URL="$(printf '%s' "$PUBLIC_BASE_URL" | tr -d '\n\r')"
           if [ -n "$PUBLIC_URL" ]; then
             echo "Using PUBLIC_URL: '$PUBLIC_URL'"
-            sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: $PUBLIC_URL|" "$MANIFEST"
-            sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: $PUBLIC_URL|" "$MANIFEST"
+            sed -i "s|CORS_ORIGINS: .*|CORS_ORIGINS: \"$PUBLIC_URL\"|" "$MANIFEST"
+            sed -i "s|OPENROUTER_REFERER: .*|OPENROUTER_REFERER: \"$PUBLIC_URL\"|" "$MANIFEST"
           fi
-          sed -i "s|POSTGRES_DB: .*|POSTGRES_DB: $PG_DB|" "$MANIFEST"
-          sed -i "s|POSTGRES_USER: .*|POSTGRES_USER: $PG_USER|" "$MANIFEST"
-          sed -i "s|DB_HOST: .*|DB_HOST: $PG_HOST|" "$MANIFEST"
-          sed -i "s|DB_PORT: .*|DB_PORT: $PG_PORT|" "$MANIFEST"
-          sed -i "s|DB_NAME: .*|DB_NAME: $PG_DB|" "$MANIFEST"
-          sed -i "s|DB_USER: .*|DB_USER: $PG_USER|" "$MANIFEST"
-          sed -i "s|DB_SSL: .*|DB_SSL: $DB_SSL_CLEAN|" "$MANIFEST"
-          sed -i "s|AZURE_SERVICE_BUS_QUEUE: .*|AZURE_SERVICE_BUS_QUEUE: $SB_QUEUE|" "$MANIFEST"
+          sed -i "s|POSTGRES_DB: .*|POSTGRES_DB: \"$PG_DB\"|" "$MANIFEST"
+          sed -i "s|POSTGRES_USER: .*|POSTGRES_USER: \"$PG_USER\"|" "$MANIFEST"
+          sed -i "s|DB_HOST: .*|DB_HOST: \"$PG_HOST\"|" "$MANIFEST"
+          sed -i "s|DB_PORT: .*|DB_PORT: \"$PG_PORT\"|" "$MANIFEST"
+          sed -i "s|DB_NAME: .*|DB_NAME: \"$PG_DB\"|" "$MANIFEST"
+          sed -i "s|DB_USER: .*|DB_USER: \"$PG_USER\"|" "$MANIFEST"
+          sed -i "s|DB_SSL: .*|DB_SSL: \"$DB_SSL_CLEAN\"|" "$MANIFEST"
+          sed -i "s|AZURE_SERVICE_BUS_QUEUE: .*|AZURE_SERVICE_BUS_QUEUE: \"$SB_QUEUE\"|" "$MANIFEST"
 
       - name: Deploy backend manifests
         run: kubectl apply -f /tmp/backend-rendered.yaml
