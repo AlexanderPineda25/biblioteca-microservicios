@@ -1,6 +1,7 @@
 import express from 'express';
 import { query, param, body, validationResult } from 'express-validator';
-import { BookController } from '../controllers/book.controller.js';
+import { BookCrudController } from '../controllers/book-crud.controller.js';
+import { BookAiController } from '../controllers/book-ai.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { requireRoles } from '../middlewares/roles.middleware.js';
 
@@ -60,7 +61,7 @@ router.get(
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt()
   ],
-  BookController.listBooks
+  BookCrudController.listBooks
 );
 
 // GET /books/available - libros disponibles (ANTES de :id)
@@ -71,7 +72,7 @@ router.get(
     query('page').optional().isInt({ min: 1 }).toInt(),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt()
   ],
-  BookController.listAvailableBooks
+  BookCrudController.listAvailableBooks
 );
 
 // POST /books/ai/recommendations - recomendar libros usando una API externa de IA
@@ -79,7 +80,7 @@ router.post(
   '/ai/recommendations',
   authMiddleware,
   validateAiRecommendation,
-  BookController.recommendBooks
+  BookAiController.recommendBooks
 );
 
 // GET /books/:id - obtener detalle de un libro
@@ -87,7 +88,7 @@ router.get(
   '/:id',
   authMiddleware,
   validateUUID,
-  BookController.getBook
+  BookCrudController.getBook
 );
 
 // POST /books - crear un libro
@@ -96,7 +97,7 @@ router.post(
   authMiddleware,
   requireRoles(writeRoles),
   validateBook,
-  BookController.createBook
+  BookCrudController.createBook
 );
 
 // PUT /books/:id - editar un libro
@@ -105,7 +106,7 @@ router.put(
   authMiddleware,
   requireRoles(writeRoles),
   [validateUUID, ...validateBook],
-  BookController.updateBook
+  BookCrudController.updateBook
 );
 
 // DELETE /books/:id - eliminar un libro
@@ -114,7 +115,7 @@ router.delete(
   authMiddleware,
   requireRoles(writeRoles),
   validateUUID,
-  BookController.deleteBook
+  BookCrudController.deleteBook
 );
 
 // PATCH /books/:id/availability - actualizar disponibilidad
@@ -123,7 +124,7 @@ router.patch(
   authMiddleware,
   requireRoles(writeRoles),
   validateAvailability,
-  BookController.updateAvailability
+  BookCrudController.updateAvailability
 );
 
 export default router;

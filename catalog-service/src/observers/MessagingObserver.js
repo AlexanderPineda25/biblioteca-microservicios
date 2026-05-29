@@ -1,10 +1,10 @@
-import { MessagingService } from '../services/messaging.service.js';
+import { messagingService } from '../services/messaging.service.js';
 import { bookEventBus } from './BookEventBus.js';
 
 export class MessagingObserver {
   static register() {
     bookEventBus.on('book.created', async (book) => {
-      await MessagingService.publishEvent('book.created', {
+      await messagingService.publishEvent('book.created', {
         id: book.id,
         title: book.title,
         author: book.author,
@@ -13,7 +13,7 @@ export class MessagingObserver {
     });
 
     bookEventBus.on('book.updated', async (book) => {
-      await MessagingService.publishEvent('book.updated', {
+      await messagingService.publishEvent('book.updated', {
         id: book.id,
         title: book.title,
         author: book.author
@@ -21,14 +21,14 @@ export class MessagingObserver {
     });
 
     bookEventBus.on('book.deleted', async (book) => {
-      await MessagingService.publishEvent('book.deleted', {
+      await messagingService.publishEvent('book.deleted', {
         id: book.id,
         title: book.title
       });
     });
 
     bookEventBus.on('book.recommended', async (data) => {
-      await MessagingService.publishEvent('book.recommended', data);
+      await messagingService.publishEvent('book.recommended', data);
     });
   }
 }

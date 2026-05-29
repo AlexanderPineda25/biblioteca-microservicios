@@ -1,7 +1,7 @@
 import { config } from './src/config/env.js';
 import sequelize from './src/config/database.js';
 import app from './src/app.js';
-import { MessagingService } from './src/services/messaging.service.js';
+import { messagingService } from './src/services/messaging.service.js';
 import { registerObservers } from './src/observers/index.js';
 
 // Importar modelos para sincronización
@@ -18,8 +18,8 @@ const startServer = async () => {
     registerObservers();
 
     // Conectar a Azure Service Bus e iniciar logger consumidor
-    await MessagingService.connect();
-    await MessagingService.startListening();
+    await messagingService.connect();
+    await messagingService.startListening();
 
     // Iniciar servidor
     app.listen(config.port, () => {
@@ -37,7 +37,7 @@ const startServer = async () => {
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down gracefully...');
-  await MessagingService.disconnect();
+  await messagingService.disconnect();
   await sequelize.close();
   process.exit(0);
 });

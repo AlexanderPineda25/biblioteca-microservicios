@@ -23,13 +23,7 @@ function loadEnv() {
 
 loadEnv();
 
-const requiredEnvVars = [
-  'PORT',
-  'AUTH_SERVICE_URL'
-];
-
-const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
-
+const missingEnvVars = ['PORT', 'AUTH_SERVICE_URL'].filter((envVar) => !process.env[envVar]);
 if (missingEnvVars.length > 0) {
   throw new Error(
     `Missing required environment variables: ${missingEnvVars.join(', ')}\n` +

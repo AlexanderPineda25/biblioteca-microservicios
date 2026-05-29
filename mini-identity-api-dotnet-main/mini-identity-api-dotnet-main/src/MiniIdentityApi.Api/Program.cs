@@ -9,6 +9,7 @@ using MiniIdentityApi.Infrastructure.Repositories;
 using MiniIdentityApi.Infrastructure.Security;
 using System.Text;
 using System.Reflection;
+using MiniIdentityApi.Api.Factories;
 using MiniIdentityApi.Api.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,6 +89,9 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.Configure<CookieSettings>(builder.Configuration.GetSection("Cookie"));
+builder.Services.AddSingleton<ICookieOptionsFactory, CookieOptionsFactory>();
 
 builder.Services.AddCors(options =>
 {
@@ -192,13 +196,17 @@ if (adminUser is null)
 }
 else
 {
-    // Update password to 'admin' in case it was set to something else
-    var salt = passwordHasher.GenerateSalt();
-    var hash = passwordHasher.Hash("admin", salt);
-    
-    var idProp = typeof(User).GetProperty("Credential", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-    idProp?.SetValue(adminUser, new Credential(hash, salt));
-    userRepository.Save(adminUser);
+    var currentHash = adminUser.Credential.PasswordHash;
+    var testHash = passwordHasher.Hash("admin", adminUser.Credential.Salt);
+    if (currentHash != testHash)
+    {
+        var salt = passwordHasher.GenerateSalt();
+        var hash = passwordHasher.Hash("admin", salt);
+        
+        var idProp = typeof(User).GetProperty("Credential", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
+        idProp?.SetValue(adminUser, new Credential(hash, salt));
+        userRepository.Save(adminUser);
+    }
 }
 
 app.UseSwagger();

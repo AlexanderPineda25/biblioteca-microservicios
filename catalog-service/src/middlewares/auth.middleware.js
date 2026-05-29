@@ -1,4 +1,4 @@
-import { AuthService } from '../services/auth.service.js';
+import { authService } from '../services/auth.service.js';
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -17,7 +17,7 @@ export const authMiddleware = async (req, res, next) => {
       });
     }
 
-    const introspectResult = await AuthService.introspectToken(token);
+    const introspectResult = await authService.introspectToken(token);
 
     if (!introspectResult.active) {
       return res.status(401).json({

@@ -3,6 +3,29 @@ import { config } from '../config/env.js';
 
 const CATALOG_TIMEOUT = 6000;
 
+export class CatalogApiClient {
+  constructor(baseURL) {
+    this._client = axios.create({
+      baseURL,
+      timeout: CATALOG_TIMEOUT,
+    });
+  }
+
+  setAccessToken(token) {
+    this._token = token;
+  }
+
+  async getAvailableBooks(page = 1, limit = 12) {
+    const response = await this._client.get('/api/catalog/books', {
+      params: { page, limit, available: 'true' },
+      headers: {
+        Authorization: `Bearer ${this._token}`
+      }
+    });
+    return response.data?.data || [];
+  }
+}
+
 const compactBook = (book) => {
   const categories = Array.isArray(book.categories) ? book.categories.join(', ') : '';
   const description = book.description ? ` - ${String(book.description).replace(/\s+/g, ' ').slice(0, 180)}` : '';
@@ -14,21 +37,17 @@ const compactBook = (book) => {
 };
 
 export class CatalogContextService {
-  static async getCatalogSnapshot(accessToken) {
+  constructor(catalogApiClient) {
+    this._catalogApi = catalogApiClient;
+  }
+
+  async getCatalogSnapshot(accessToken) {
     if (!accessToken) return 'No se pudo consultar el catalogo autenticado.';
 
-    try {
-      const response = await axios.get(
-        `${config.catalogServiceUrl}/api/catalog/books?page=1&limit=12&available=true`,
-        {
-          timeout: CATALOG_TIMEOUT,
-          headers: {
-            Authorization: `Bearer ${accessToken}`
-          }
-        }
-      );
+    this._catalogApi.setAccessToken(accessToken);
 
-      const books = response.data?.data || [];
+    try {
+      const books = await this._catalogApi.getAvailableBooks();
       if (!books.length) {
         return 'El catalogo no tiene libros disponibles en este momento.';
       }
@@ -40,3 +59,6 @@ export class CatalogContextService {
     }
   }
 }
+
+export const catalogApiClient = new CatalogApiClient(config.catalogServiceUrl);
+export const catalogContextService = new CatalogContextService(catalogApiClient);

@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { validateRequiredEnv, parseBoolean } from '../utils/validate-env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,7 +24,7 @@ function loadEnv() {
 
 loadEnv();
 
-const requiredEnvVars = [
+validateRequiredEnv([
   'PORT',
   'DB_HOST',
   'DB_PORT',
@@ -31,20 +32,7 @@ const requiredEnvVars = [
   'DB_USER',
   'AUTH_SERVICE_URL',
   'AZURE_SERVICE_BUS_CONNECTION_STRING'
-];
-
-const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
-
-if (missingEnvVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables: ${missingEnvVars.join(', ')}\n` +
-    `Please check your .env file and ensure all required variables are set.`
-  );
-}
-
-const parseBoolean = (value) => ['1', 'true', 'yes', 'require', 'required'].includes(
-  String(value || '').trim().toLowerCase()
-);
+]);
 
 export const config = {
   port: parseInt(process.env.PORT, 10),

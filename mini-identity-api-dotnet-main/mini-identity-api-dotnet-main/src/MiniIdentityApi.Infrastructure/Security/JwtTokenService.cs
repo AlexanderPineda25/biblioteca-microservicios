@@ -27,7 +27,7 @@ public class JwtTokenService : ITokenService
             new(JwtRegisteredClaimNames.Email, user.Email)
         };
 
-        claims.AddRange(user.Roles.Select(role => new Claim(ClaimTypes.Role, role.Name)));
+        claims.AddRange(user.Roles.Select(role => new Claim("role", role.Name)));
 
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
@@ -72,7 +72,8 @@ public class JwtTokenService : ITokenService
 
             var userId = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             var username = principal.FindFirst(JwtRegisteredClaimNames.UniqueName)?.Value;
-            var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+            var email = principal.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
+            var roles = principal.FindAll("role").Select(c => c.Value).ToList();
             var permissions = principal.FindAll("permission").Select(c => c.Value).ToList();
 
             return new IntrospectResponse
@@ -80,6 +81,7 @@ public class JwtTokenService : ITokenService
                 Active = true,
                 UserId = userId,
                 Username = username,
+                Email = email,
                 Roles = roles,
                 Permissions = permissions
             };

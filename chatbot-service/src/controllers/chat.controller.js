@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { ChatbotService } from '../services/chatbot.service.js';
+import { chatbotService } from '../services/chatbot.service.js';
 import { RedisStreamService } from '../services/redis-stream.service.js';
 
 const validateMessagePayload = (body) => {
@@ -42,10 +42,9 @@ export class ChatController {
         message: payload.message
       });
 
-      const result = await ChatbotService.answer({
+      const result = await chatbotService.answer({
         message: payload.message,
         history: payload.history,
-        conversationId,
         user: req.user,
         accessToken: req.accessToken
       });

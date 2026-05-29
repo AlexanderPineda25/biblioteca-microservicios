@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MiniIdentityApi.Api.Factories;
 using MiniIdentityApi.Application.DTOs.Auth;
 using MiniIdentityApi.Application.DTOs.Introspection;
 using MiniIdentityApi.Application.Services;
@@ -10,10 +11,12 @@ namespace MiniIdentityApi.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly AuthenticationService _authenticationService;
+    private readonly ICookieOptionsFactory _cookieOptionsFactory;
 
-    public AuthController(AuthenticationService authenticationService)
+    public AuthController(AuthenticationService authenticationService, ICookieOptionsFactory cookieOptionsFactory)
     {
         _authenticationService = authenticationService;
+        _cookieOptionsFactory = cookieOptionsFactory;
     }
 
     [HttpPost("register")]
@@ -41,16 +44,14 @@ public class AuthController : ControllerBase
         {
             var response = _authenticationService.Login(request);
 
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = Request.IsHttps || (Request.Headers["X-Forwarded-Proto"] == "https"),
-                SameSite = SameSiteMode.Lax,
-                MaxAge = TimeSpan.FromHours(1)
-            };
-
+            var cookieOptions = _cookieOptionsFactory.CreateAccessTokenCookie();
             Response.Cookies.Append("access_token", response.AccessToken, cookieOptions);
-            return Ok(response);
+            return Ok(new
+            {
+                username = response.Username,
+                email = response.Email,
+                roles = response.Roles
+            });
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -84,6 +85,7 @@ public class AuthController : ControllerBase
         {
             userId = response.UserId,
             username = response.Username,
+            email = response.Email,
             roles = response.Roles,
             permissions = response.Permissions
         });
